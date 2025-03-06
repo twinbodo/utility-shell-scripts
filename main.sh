@@ -56,9 +56,29 @@ add_github_user() {
     echo "Added Github User."
 }
 
+add_maccy() {
+    echo "Checking if Maccy is installed..."
+
+    # Check if Maccy is already installed
+    if command -v maccy &> /dev/null; then
+        echo "Maccy is already installed."
+    else
+        echo "Maccy is not installed."
+
+        # Tap the Maccy formulae if necessary
+        if ! brew list --cask | grep -q maccy; then
+            echo "Installing Maccy via Homebrew..."
+            brew install --cask maccy
+        else
+            echo "Maccy is already installed via Homebrew."
+        fi
+    fi
+}
+
 main() {
     install_homebrew
     install_blueutil
+    add_maccy
     echo "Setup complete. The script will run every 5 minutes to manage Bluetooth."
 }
 
