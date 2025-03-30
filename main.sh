@@ -56,6 +56,36 @@ add_github_user() {
     echo "Added Github User."
 }
 
+setup_custom_functions() {
+    FUNCTIONS_FILE="$HOME/custom_functions.sh"
+
+    # Create the custom functions file if it doesn't exist
+    if [[ ! -f "$FUNCTIONS_FILE" ]]; then
+        echo "Creating $FUNCTIONS_FILE."
+        touch "$FUNCTIONS_FILE"
+    fi
+
+    # Add the move function if it doesn't exist
+    if ! grep -q "move() {" "$FUNCTIONS_FILE"; then
+        echo "Adding move function to $FUNCTIONS_FILE."
+        echo "move() {" >> "$FUNCTIONS_FILE"
+        echo "    mkdir -p \"\$1\" && cd \"\$1\"" >> "$FUNCTIONS_FILE"
+        echo "}" >> "$FUNCTIONS_FILE"
+        echo "move function added."
+    else
+        echo "move function already exists in $FUNCTIONS_FILE."
+    fi
+
+    # Source the custom functions file in .zshrc if not already sourced
+    if ! grep -q "source $FUNCTIONS_FILE" "$HOME/.zshrc"; then
+        echo "Sourcing $FUNCTIONS_FILE in .zshrc."
+        echo "source $FUNCTIONS_FILE" >> "$HOME/.zshrc"
+    else
+        echo "$FUNCTIONS_FILE is already sourced in .zshrc."
+    fi
+}
+
+
 add_maccy() {
     echo "Checking if Maccy is installed..."
 
@@ -75,11 +105,85 @@ add_maccy() {
     fi
 }
 
-main() {
-    install_homebrew
-    install_blueutil
-    add_maccy
-    echo "Setup complete. The script will run every 5 minutes to manage Bluetooth."
+# Function to set up multiple aliases
+setup_aliases() {
+    ALIAS_FILE="$HOME/.zshrc"  # Change to .zshrc for Zsh users
+
+    # Define indexed arrays for aliases and their commands
+    aliases=("ll" "la" ".." "..." "setdisplay" )  # Added new alias
+    commands=("ls -l" "ls -la" "cd .." "cd ../.." "displayplacer \"id:1 enabled:true scaling:on origin:(0,0) degree:0\" \"id:2 enabled:true scaling:off origin:(-250,-1200) degree:0\"")  # Added new command
+
+    # Check if the alias file exists
+    if [[ ! -f "$ALIAS_FILE" ]]; then
+        echo "$ALIAS_FILE does not exist. Creating it."
+        touch "$ALIAS_FILE"
+    fi
+
+    # Iterate over the aliases and set them up
+    for i in "${!aliases[@]}"; do
+        alias_name="${aliases[$i]}"
+        alias_command="${commands[$i]}"
+        # Check if the alias already exists
+        if grep -q "alias $alias_name=" "$ALIAS_FILE"; then
+            echo "Alias '$alias_name' already exists."
+        else
+            echo "Adding alias '$alias_name' to $ALIAS_FILE."
+            echo "alias $alias_name='$alias_command'" >> "$ALIAS_FILE"
+            echo "Alias '$alias_name' added."
+        fi
+    done
 }
 
+install_displayplacer() {
+    echo "Checking for displayplacer..."
+    if ! command -v displayplacer &> /dev/null; then
+        echo "displayplacer not found, installing displayplacer..."
+        brew install displayplacer
+    else
+        echo "displayplacer is already installed."
+    fi
+}
+
+# Function to install zsh-autosuggestions
+install_zsh_autosuggestions() {
+    echo "Checking for zsh-autosuggestions..."
+    ZSH_AUTOSUGGESTIONS_DIR="$HOME/.zsh/zsh-autosuggestions"
+
+    if [[ -d "$ZSH_AUTOSUGGESTIONS_DIR" ]]; then
+        echo "zsh-autosuggestions is already installed."
+    else
+        echo "Installing zsh-autosuggestions..."
+        git clone https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_AUTOSUGGESTIONS_DIR"
+        echo "source $ZSH_AUTOSUGGESTIONS_DIR/zsh-autosuggestions.zsh" >> "$HOME/.zshrc"
+        echo "zsh-autosuggestions installed and sourced in .zshrc."
+    fi
+}
+
+main() {
+    echo "Starting Setup"
+    install_homebrew
+
+    read -p "Do you want to install all tools at once? (y/n): " install_all
+    # Use indexed arrays for items and their corresponding functions
+    items=("blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions")
+    functions=("install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions")
+
+    if [[ $install_all == "y" ]]; then
+        # Install all tools by iterating over the functions
+        for func in "${functions[@]}"; do
+            $func  # Call the corresponding function
+        done
+    else
+        for i in "${!items[@]}"; do
+            read -p "Do you want to install ${items[$i]}? (y/n): " choice
+            if [[ $choice == "y" ]]; then
+                ${functions[$i]}  # Call the corresponding function
+            else
+                echo "Skipping ${items[$i]} installation."
+            fi
+        done
+    fi
+
+    echo "Setup complete. The script will run every 5 minutes to manage Bluetooth."
+}
 main

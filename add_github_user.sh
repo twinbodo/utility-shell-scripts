@@ -1,11 +1,15 @@
 #!/bin/bash
 
+# Check if git is installed
+if ! command -v git &> /dev/null; then
+    echo "git could not be found, please install it first."
+    exit 1
+fi
+
 # Ensure script is executed with error handling
 set -e
 set -o pipefail
-
-# Replace these variables with your actual email and desired SSH key file name
-SECOND_EMAIL="<add-git-hub-users>"
+read -p "Please enter the email for the second github account: " SECOND_EMAIL
 
 # Validate email format (very basic, can be enhanced)
 if [[ ! "$SECOND_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
@@ -82,11 +86,8 @@ fi
 
 echo "Configuration complete. Remember to use the github.com-$username host in your Git commands for the second account."
 
-# Check if git is installed
-if ! command -v git &> /dev/null; then
-    echo "git could not be found, please install it first."
-    exit 1
-fi
+read -p "If you have updated the github account with correct SSH key, press enter to continue"
+
 
 # Repository level changes
 # git config user.name "$username"
