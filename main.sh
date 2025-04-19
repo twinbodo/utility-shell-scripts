@@ -2,6 +2,10 @@
 
 CUR_DIR=$(pwd)
 
+# Source all module files
+DIR="$(dirname "$0")"
+source "$DIR/keyboard_manager.sh"
+
 # Function to install Homebrew if it's not installed
 install_homebrew() {
     echo "Checking for Homebrew..."
@@ -180,8 +184,8 @@ main() {
 
     read -p "Do you want to install all tools at once? (y/n): " install_all
     # Use indexed arrays for items and their corresponding functions
-    items=("blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" "Move Back N Commits")
-    functions=("install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" "move_back_n_commits")
+    items=( "Keyboard Manager" "blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" "Move Back N Commits")
+    functions=( "setup_keyboard_manager" "install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" "move_back_n_commits")
 
     if [[ $install_all == "y" ]]; then
         # Install all tools by iterating over the functions

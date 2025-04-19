@@ -10,3 +10,41 @@ How to edit the keybindings?
 3. Copy the file from the gitrepo and paste it there, Just done.
 
 `displayplacer "id:1 enabled:true scaling:on origin:(0,0) degree:0" "id:2 enabled:true scaling:off origin:(-250,-1200) degree:0"`
+
+
+Sample key keyboard manager object
+`{
+   "devices": [
+       {
+           "identifiers": {
+               "is_keyboard": true,
+               "product_id": 13330,
+               "vendor_id": 14
+           },
+           "simple_modifications": [
+               {
+                   "from": { "key_code": "left_command" },
+                   "to": [{ "key_code": "left_option" }]
+               }
+           ]
+       },
+       {
+           "identifiers": {
+               "is_keyboard": true,
+               "product_id": 13330,
+               "vendor_id": 14
+           },
+           "simple_modifications": [
+               {
+                   "from": { "key_code": "left_option" },
+                   "to": [{ "key_code": "left_command" }]
+               }
+           ]
+       }
+   ],
+   "name": "New profile custom",
+   "selected": true,
+   "virtual_hid_keyboard": { "keyboard_type_v2": "ansi" }
+}
+
+`
