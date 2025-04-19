@@ -163,6 +163,24 @@ install_zsh_autosuggestions() {
     fi
 }
 
+# Function to install Rectangle
+install_rectangle() {
+    echo "Checking if Rectangle is installed..."
+    
+    # Check if Rectangle is already installed
+    if [ -d "/Applications/Rectangle.app" ]; then
+        echo "Rectangle is already installed."
+    else
+        echo "Rectangle is not installed."
+        
+        # Install Rectangle via Homebrew
+        echo "Installing Rectangle via Homebrew..."
+        brew install --cask rectangle
+        
+        echo "Rectangle has been installed."
+    fi
+}
+
 move_back_n_commits() {
     read -p "Enter the number of commits to move back: " n
     read -p "Do you want to perform a soft or hard reset? (soft/hard): " reset_type
@@ -184,8 +202,8 @@ main() {
 
     read -p "Do you want to install all tools at once? (y/n): " install_all
     # Use indexed arrays for items and their corresponding functions
-    items=( "Keyboard Manager" "blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" "Move Back N Commits")
-    functions=( "setup_keyboard_manager" "install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" "move_back_n_commits")
+    items=( "Rectangle" "Keyboard Manager" "blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" )
+    functions=( "install_rectangle" "setup_keyboard_manager" "install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" )
 
     if [[ $install_all == "y" ]]; then
         # Install all tools by iterating over the functions
