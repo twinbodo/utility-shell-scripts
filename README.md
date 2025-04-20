@@ -14,6 +14,7 @@ Days of the week (0-7, where 0 or 7 is Sunday): * means "every day of the week."
 To save editor use - `:wq!` command
 
 If we want to run the script in every 4 hour, then we can update the script like this - `0 */4 * * *`
+<br />
 How to edit the keybindings?
 1. you can navigate through the menu by selecting File (or Code on macOS) > Preferences > Keyboard Shortcuts.
 2. Access Keybindings JSON:
