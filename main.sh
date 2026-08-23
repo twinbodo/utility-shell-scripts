@@ -17,34 +17,6 @@ install_homebrew() {
     fi
 }
 
-add_cron_job() {
-    # Check if the cron job is already set
-    if crontab -l | grep -q "$CUR_DIR/bluetooth_manager.sh"; then
-        echo "Cron job for $cron_entry_check is already set."
-    else
-        echo "No existing cron job found for $cron_entry_check."
-        echo "Adding the cron job..."
-        (crontab -l ; echo "*/5 * * * * $CUR_DIR/bluetooth_manager.sh >> $CUR_DIR/bluetooth_manager.log 2>&1") | crontab -
-        echo "Cron job added to run every 5 minutes."
-    fi
-}
-
-# Function to install blueutil
-install_blueutil() {
-    echo "Checking for blueutil..."
-    if ! command -v blueutil &> /dev/null; then
-        echo "blueutil not found, installing blueutil..."
-        brew install blueutil
-    else
-        echo "blueutil is already installed."
-    fi
-
-    SCRIPT_PATH="$CUR_DIR/bluetooth_manager.sh"
-    chmod +x "$SCRIPT_PATH"
-    echo "Bluetooth management script created and made executable."
-    add_cron_job
-}
-
 add_github_user() {
     echo "Starting Adding Github User"
     
@@ -202,8 +174,8 @@ main() {
 
     read -p "Do you want to install all tools at once? (y/n): " install_all
     # Use indexed arrays for items and their corresponding functions
-    items=( "Rectangle" "Keyboard Manager" "blueutil" "Maccy" "Add Github User" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" )
-    functions=( "install_rectangle" "setup_keyboard_manager" "install_blueutil" "add_maccy" "add_github_user" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" )
+    items=( "Rectangle" "Maccy" "Setup Aliases" "Setup Custom Functions" "Displayplacer" "Zsh Autosuggestions" )
+    functions=( "install_rectangle" "add_maccy" "setup_aliases" "setup_custom_functions" "install_displayplacer" "install_zsh_autosuggestions" )
 
     if [[ $install_all == "y" ]]; then
         # Install all tools by iterating over the functions
