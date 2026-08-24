@@ -83,8 +83,8 @@ If you already cloned a repository but it is trying to use your primary account,
 
 2. **Update the Commit Identity:**
    ```bash
-   git config user.name "twinbodo"
-   git config user.email "twinbodo@gmail.com"
+   git config user.name "tw"
+   git config user.email "tw@tw.com"
    ```
 
 
