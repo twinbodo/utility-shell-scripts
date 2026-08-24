@@ -79,24 +79,25 @@ def sync(mode="sync"):
     if synced_items: return True, "\n".join(synced_items)
     return True, "NO_CHANGES"
 
-def setup_hammerspoon():
+def get_lua_config():
+    """Generates the master Lua string"""
     try:
         rel_path = REPO_DIR.relative_to(Path.home())
         lua_repo_path = f'os.getenv("HOME") .. "/{rel_path}"'
     except ValueError:
         lua_repo_path = f'"{REPO_DIR}"'
 
-    lua_config = f"""
+    return f"""
 require("bluetooth")
 require("cursor")
 -- Switch Monitor to USB-C (Standard DDC code is 27)
-hs.hotkey.bind({"cmd", "shift"}, "1", function()
+hs.hotkey.bind({{"cmd", "shift"}}, "1", function()
     hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 27")
     hs.alert.show("Switched to USB-C")
 end)
 
 -- Switch Monitor to HDMI (Standard DDC code is 17)
-hs.hotkey.bind({"cmd", "shift"}, "2", function()
+hs.hotkey.bind({{"cmd", "shift"}}, "2", function()
     hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 17")
     hs.alert.show("Switched to HDMI")
 end)
@@ -113,7 +114,12 @@ local function executeSync(mode, loadingText)
         if dotMenu then dotMenu:setTitle("🔄") end
         if exitCode == 0 then
             local output = stdOut:gsub("^%s*(.-)%s*$", "%1")
-            if output ~= "NO_CHANGES" and output ~= "" then
+            
+            -- Special handling for Lua updates
+            if output == "CONFIG_UPDATED" then
+                hs.notify.new({{ title = "DotSync", informativeText = "Lua Config updated! Reloading..." }}):send()
+                hs.timer.doAfter(2, hs.reload)
+            elseif output ~= "NO_CHANGES" and output ~= "" then
                 local n = hs.notify.new({{ title = "Dotfiles " .. loadingText, informativeText = output }})
                 n:send()
                 hs.timer.doAfter(5, function() n:withdraw() end)
@@ -130,8 +136,9 @@ local function runDotSyncPublish() executeSync("publish", "Pushing") end
 local function runDotSyncPull() executeSync("pull", "Pulling") end
 local function runDotSyncApply() executeSync("apply", "Applying") end
 local function runDotSyncFull() executeSync("sync", "Syncing") end
+local function runDotSyncLua() executeSync("update_lua", "Updating Lua") end
 
--- 1. THE SPOTLIGHT UI (For the Keyboard Shortcut & URL)
+-- 1. THE SPOTLIGHT UI
 local dotChooser = hs.chooser.new(function(choice)
     if not choice then return end 
     if choice.id == "stage" then runDotSyncStage()
@@ -139,6 +146,7 @@ local dotChooser = hs.chooser.new(function(choice)
     elseif choice.id == "pull" then runDotSyncPull()
     elseif choice.id == "apply" then runDotSyncApply()
     elseif choice.id == "full" then runDotSyncFull()
+    elseif choice.id == "update_lua" then runDotSyncLua()
     end
 end)
 
@@ -147,10 +155,11 @@ dotChooser:choices({{
     {{ text = "2. Push to GitHub", subText = "Repo -> GitHub", id = "publish" }},
     {{ text = "3. Pull from GitHub", subText = "GitHub -> Repo", id = "pull" }},
     {{ text = "4. Apply to System", subText = "Repo -> System", id = "apply" }},
-    {{ text = "5. Full Sync", subText = "Automatically do all steps", id = "full" }}
+    {{ text = "5. Full Sync", subText = "Automatically do all steps", id = "full" }},
+    {{ text = "6. Sync Lua Config", subText = "Update init.lua and Reload", id = "update_lua" }}
 }})
 
--- 2. THE MENU BAR ICON (Clickable list)
+-- 2. THE MENU BAR ICON
 if dotMenu then
     dotMenu:setMenu({{
         {{ title = "Shortcut: Cmd + Option + D", disabled = true }},
@@ -161,6 +170,8 @@ if dotMenu then
         {{ title = "Apply to System", fn = runDotSyncApply }},
         {{ title = "-", disabled = true }},
         {{ title = "Full Sync", fn = runDotSyncFull }},
+        {{ title = "Sync Lua Config", fn = runDotSyncLua }},
+        {{ title = "-", disabled = true }},
         {{ title = "Open Dotfiles Repo", fn = function() hs.execute("open " .. repoPath) end }}
     }})
 end
@@ -175,6 +186,27 @@ hs.urlevent.bind("dotsync", function(eventName, params)
     dotChooser:show()
 end)
 """
+
+def update_lua():
+    """Compares the active init.lua with the master config. Updates and triggers reload if changed."""
+    lua_code = get_lua_config()
+    init_lua = Path.home() / ".hammerspoon" / "init.lua"
+    
+    current_code = ""
+    if init_lua.exists():
+        current_code = init_lua.read_text()
+        
+    # Check if the content is exactly the same (ignoring trailing whitespace)
+    if current_code.strip() == lua_code.strip():
+        return True, "NO_CHANGES"
+    
+    # If they are different, overwrite the system file
+    init_lua.parent.mkdir(parents=True, exist_ok=True)
+    init_lua.write_text(lua_code.strip() + "\n")
+    return True, "CONFIG_UPDATED"
+
+def setup_hammerspoon():
+    lua_config = get_lua_config()
     process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, text=True)
     process.communicate(lua_config)
     print("\n✅ Hammerspoon configuration copied to clipboard!")
@@ -185,6 +217,10 @@ if __name__ == "__main__":
     if action == "setup":
         apply_first_time()
         setup_hammerspoon()
+    elif action == "update_lua":
+        success, message = update_lua()
+        print(message)
+        sys.exit(0 if success else 1)
     elif action in ["sync", "stage", "publish", "pull", "apply"]:
         success, message = sync(action)
         print(message)
