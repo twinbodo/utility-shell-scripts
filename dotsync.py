@@ -188,21 +188,27 @@ end)
 """
 
 def update_lua():
-    """Compares the active init.lua with the master config. Updates and triggers reload if changed."""
-    lua_code = get_lua_config()
+    """Checks if the master config is in init.lua. If not, appends it and triggers reload."""
+    lua_code = get_lua_config().strip()
     init_lua = Path.home() / ".hammerspoon" / "init.lua"
     
     current_code = ""
     if init_lua.exists():
         current_code = init_lua.read_text()
         
-    # Check if the content is exactly the same (ignoring trailing whitespace)
-    if current_code.strip() == lua_code.strip():
+    # 1. Check if this exact configuration block is already inside the file
+    if lua_code in current_code:
         return True, "NO_CHANGES"
     
-    # If they are different, overwrite the system file
+    # 2. If it is NOT present, append it to the bottom of the file
     init_lua.parent.mkdir(parents=True, exist_ok=True)
-    init_lua.write_text(lua_code.strip() + "\n")
+    with open(init_lua, "a") as f:
+        # Add a couple of newlines just in case the previous line didn't end cleanly
+        f.write("\n\n-- ==========================================\n")
+        f.write("-- DOTSYNC AUTO-GENERATED CONFIG\n")
+        f.write("-- ==========================================\n")
+        f.write(lua_code + "\n")
+        
     return True, "CONFIG_UPDATED"
 
 def setup_hammerspoon():
