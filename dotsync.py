@@ -186,30 +186,36 @@ hs.urlevent.bind("dotsync", function(eventName, params)
     dotChooser:show()
 end)
 """
-
 def update_lua():
-    """Checks if the master config is in init.lua. If not, appends it and triggers reload."""
+    """Isolates the config in dotsync.lua and safely imports it into init.lua."""
     lua_code = get_lua_config().strip()
-    init_lua = Path.home() / ".hammerspoon" / "init.lua"
+    hs_dir = Path.home() / ".hammerspoon"
+    init_lua = hs_dir / "init.lua"
+    dotsync_lua = hs_dir / "dotsync.lua"
     
-    current_code = ""
-    if init_lua.exists():
-        current_code = init_lua.read_text()
+    hs_dir.mkdir(parents=True, exist_ok=True)
+    changed = False
+
+    # 1. Manage the dotsync.lua file safely
+    current_dotsync = dotsync_lua.read_text().strip() if dotsync_lua.exists() else ""
+    if current_dotsync != lua_code:
+        dotsync_lua.write_text(lua_code + "\n")
+        changed = True
         
-    # 1. Check if this exact configuration block is already inside the file
-    if lua_code in current_code:
-        return True, "NO_CHANGES"
+    # 2. Ensure init.lua imports the new file
+    # Note: When using require, we leave out the .lua extension[cite: 1]
+    import_stmt = 'require("dotsync")'
+    current_init = init_lua.read_text() if init_lua.exists() else ""
     
-    # 2. If it is NOT present, append it to the bottom of the file
-    init_lua.parent.mkdir(parents=True, exist_ok=True)
-    with open(init_lua, "a") as f:
-        # Add a couple of newlines just in case the previous line didn't end cleanly
-        f.write("\n\n-- ==========================================\n")
-        f.write("-- DOTSYNC AUTO-GENERATED CONFIG\n")
-        f.write("-- ==========================================\n")
-        f.write(lua_code + "\n")
+    if import_stmt not in current_init:
+        with open(init_lua, "a") as f:
+            f.write(f"\n-- Added by DotSync\n{import_stmt}\n")
+        changed = True
         
-    return True, "CONFIG_UPDATED"
+    # Only trigger a reload if a file was actually modified
+    if changed:
+        return True, "CONFIG_UPDATED"
+    return True, "NO_CHANGES"
 
 def setup_hammerspoon():
     lua_config = get_lua_config()
