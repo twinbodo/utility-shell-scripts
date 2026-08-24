@@ -15,101 +15,71 @@ def run_cmd(cmd, check=False):
 def get_mtime(path):
     return path.stat().st_mtime if path.exists() else 0
 
+def get_sys_path(raw_path):
+    import getpass
+    username = getpass.getuser()
+    parsed_path = raw_path.replace("{$User}", username).replace("{$USER}", username).replace("{User}", username)
+    if parsed_path.startswith("Users/"):
+        parsed_path = "/" + parsed_path
+    return Path(os.path.expandvars(os.path.expanduser(parsed_path))).resolve()
+
 def apply_first_time():
-    if not MANIFEST_PATH.exists():
-        print(f"Error: {MANIFEST_PATH} not found.")
-        return False
-    with open(MANIFEST_PATH, "r") as f:
-        mapping = json.load(f)
+    if not MANIFEST_PATH.exists(): return False
+    with open(MANIFEST_PATH, "r") as f: mapping = json.load(f)
     for repo_rel_path, target_raw in mapping.items():
         repo_file = (REPO_DIR / repo_rel_path).resolve()
-        sys_file = Path(os.path.expandvars(os.path.expanduser(target_raw))).resolve()
-        if not repo_file.exists():
-            continue
+        sys_file = get_sys_path(target_raw)
+        if not repo_file.exists(): continue
         sys_file.parent.mkdir(parents=True, exist_ok=True)
-        if sys_file.exists():
-            backup = sys_file.with_suffix(sys_file.suffix + ".backup")
-            shutil.copy2(sys_file, backup)
+        if sys_file.exists(): shutil.copy2(sys_file, sys_file.with_suffix(sys_file.suffix + ".backup"))
         shutil.copy2(repo_file, sys_file)
     return True
 
 def sync(mode="sync"):
-    if not MANIFEST_PATH.exists():
-        return False, "manifest.json not found."
-
-    with open(MANIFEST_PATH, "r") as f:
-        mapping = json.load(f)
-
+    if not MANIFEST_PATH.exists(): return False, "manifest.json not found."
+    with open(MANIFEST_PATH, "r") as f: mapping = json.load(f)
     synced_items = []
 
-    # 1. STAGE (System -> Repo)
     if mode in ["sync", "stage"]:
         for repo_rel, target_raw in mapping.items():
             repo_file = (REPO_DIR / repo_rel).resolve()
-            sys_file = Path(os.path.expandvars(os.path.expanduser(target_raw))).resolve()
-            
-            if sys_file.exists():
-                if get_mtime(sys_file) > get_mtime(repo_file):
-                    repo_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(sys_file, repo_file)
-                    
-                    if repo_file.suffix == '.plist':
-                        run_cmd(["plutil", "-convert", "xml1", str(repo_file)])
-                    
-                    synced_items.append(f"📝 Staged {sys_file.name}")
-        
-        if mode == "stage":
-            return True, ("\n".join(synced_items) + "\n\nReady for Git review." if synced_items else "NO_CHANGES")
+            sys_file = get_sys_path(target_raw)
+            if sys_file.exists() and get_mtime(sys_file) > get_mtime(repo_file):
+                repo_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(sys_file, repo_file)
+                if repo_file.suffix == '.plist': run_cmd(["plutil", "-convert", "xml1", str(repo_file)])
+                synced_items.append(f"📝 Staged {sys_file.name}")
+        if mode == "stage": return True, ("\n".join(synced_items) + "\n\nReady for Git review." if synced_items else "NO_CHANGES")
 
-    # 2. PULL (Remote -> Repo)
     if mode in ["sync", "pull"]:
         pull_res = run_cmd(["git", "pull", "--rebase", "--autostash"])
-        if pull_res.returncode != 0:
-            return False, f"Pull conflict: {pull_res.stderr.strip()}"
-        if mode == "pull":
-            return True, "✅ Successfully pulled from GitHub."
+        if pull_res.returncode != 0: return False, f"Pull conflict: {pull_res.stderr.strip()}"
+        if mode == "pull": return True, "✅ Successfully pulled from GitHub."
 
-    # 3. APPLY (Repo -> System)
     if mode in ["sync", "apply"]:
         for repo_rel, target_raw in mapping.items():
             repo_file = (REPO_DIR / repo_rel).resolve()
-            sys_file = Path(os.path.expandvars(os.path.expanduser(target_raw))).resolve()
-            
-            if repo_file.exists():
-                if get_mtime(repo_file) > get_mtime(sys_file):
-                    sys_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(repo_file, sys_file)
-                    synced_items.append(f"⬇️ Applied {sys_file.name} to system")
-        
-        if mode == "apply":
-            return True, ("\n".join(synced_items) if synced_items else "NO_CHANGES")
+            sys_file = get_sys_path(target_raw)
+            if repo_file.exists() and get_mtime(repo_file) > get_mtime(sys_file):
+                sys_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(repo_file, sys_file)
+                synced_items.append(f"⬇️ Applied {sys_file.name} to system")
+        if mode == "apply": return True, ("\n".join(synced_items) if synced_items else "NO_CHANGES")
 
-    # 4. PUBLISH (Repo -> Remote)
     if mode in ["sync", "publish"]:
         status_res = run_cmd(["git", "status", "--porcelain"])
         if status_res.stdout.strip():
             run_cmd(["git", "add", "-A"])
             run_cmd(["git", "commit", "-m", "Auto-sync config update"])
-            push_res = run_cmd(["git", "push"])
-            if push_res.returncode != 0:
-                return False, f"Push failed: {push_res.stderr.strip()}"
-            
-            if mode == "publish":
-                return True, "✅ Changes successfully pushed to GitHub."
+            if run_cmd(["git", "push"]).returncode != 0: return False, "Push failed."
+            if mode == "publish": return True, "✅ Changes successfully pushed to GitHub."
             synced_items.append("⬆️ Pushed changes to GitHub.")
-        elif mode == "publish":
-            return True, "NO_CHANGES"
+        elif mode == "publish": return True, "NO_CHANGES"
 
-    if synced_items:
-        return True, "\n".join(synced_items)
+    if synced_items: return True, "\n".join(synced_items)
     return True, "NO_CHANGES"
 
 def setup_hammerspoon():
-    hs_app = Path("/Applications/Hammerspoon.app")
-    if not hs_app.exists():
-        if run_cmd(["which", "brew"]).returncode == 0:
-            subprocess.run(["brew", "install", "--cask", "hammerspoon"])
-
     try:
         rel_path = REPO_DIR.relative_to(Path.home())
         lua_repo_path = f'os.getenv("HOME") .. "/{rel_path}"'
@@ -120,41 +90,23 @@ def setup_hammerspoon():
 local repoPath = {lua_repo_path}
 local syncScript = repoPath .. "/dotsync.py"
 
--- ==========================================
--- CONFIGURATION
--- ==========================================
-local isAutomated = false  -- Set to false for manual 4-step testing. True for full automation.
-local testingMode = true   -- If automated, true = every 1 min, false = every 6 hours
--- ==========================================
-
 local dotMenu = hs.menubar.new()
-if dotMenu then
-    dotMenu:setTitle("DotSync")
-end
+if dotMenu then dotMenu:setTitle("🔄") end
 
 local function executeSync(mode, loadingText)
-    if dotMenu then dotMenu:setTitle(loadingText .. "...") end
-    
+    if dotMenu then dotMenu:setTitle("⏳") end
     hs.task.new(syncScript, function(exitCode, stdOut, stdErr)
-        if dotMenu then dotMenu:setTitle("DotSync") end
-        
+        if dotMenu then dotMenu:setTitle("🔄") end
         if exitCode == 0 then
             local output = stdOut:gsub("^%s*(.-)%s*$", "%1")
             if output ~= "NO_CHANGES" and output ~= "" then
-                local n = hs.notify.new({{
-                    title = "Dotfiles " .. loadingText,
-                    informativeText = output
-                }})
+                local n = hs.notify.new({{ title = "Dotfiles " .. loadingText, informativeText = output }})
                 n:send()
                 hs.timer.doAfter(5, function() n:withdraw() end)
             end
         else
-            if dotMenu then dotMenu:setTitle("Sync ⚠️") end
-            local n = hs.notify.new({{
-                title = "Sync Error",
-                informativeText = stdErr or stdOut
-            }})
-            n:send()
+            if dotMenu then dotMenu:setTitle("⚠️") end
+            hs.notify.new({{ title = "Sync Error", informativeText = stdErr or stdOut }}):send()
         end
     end, {{mode}}):start()
 end
@@ -165,51 +117,54 @@ local function runDotSyncPull() executeSync("pull", "Pulling") end
 local function runDotSyncApply() executeSync("apply", "Applying") end
 local function runDotSyncFull() executeSync("sync", "Syncing") end
 
-if isAutomated then
-    if dotMenu then
-        dotMenu:setMenu({{
-            {{ title = "Sync Now", fn = runDotSyncFull }},
-            {{ title = "-", disabled = true }},
-            {{ title = "Open Dotfiles Repo", fn = function() hs.execute("open " .. repoPath) end }}
-        }})
+-- 1. THE SPOTLIGHT UI (For the Keyboard Shortcut & URL)
+local dotChooser = hs.chooser.new(function(choice)
+    if not choice then return end 
+    if choice.id == "stage" then runDotSyncStage()
+    elseif choice.id == "publish" then runDotSyncPublish()
+    elseif choice.id == "pull" then runDotSyncPull()
+    elseif choice.id == "apply" then runDotSyncApply()
+    elseif choice.id == "full" then runDotSyncFull()
     end
-    
-    hs.hotkey.bind({{"alt", "cmd"}}, "S", runDotSyncFull)
-    
-    if testingMode then
-        hs.timer.doEvery(60, runDotSyncFull)
-    else
-        hs.timer.doEvery(6 * 60 * 60, runDotSyncFull)
-    end
-    hs.timer.doAfter(5, runDotSyncFull)
-else
-    if dotMenu then
-        dotMenu:setMenu({{
-            {{ title = "⬆️ UPLOAD FLOW", disabled = true }},
-            {{ title = "Step 1: Stage Changes (System -> Repo)", fn = runDotSyncStage }},
-            {{ title = "Step 2: Push to GitHub", fn = runDotSyncPublish }},
-            {{ title = "-", disabled = true }},
-            {{ title = "⬇️ DOWNLOAD FLOW", disabled = true }},
-            {{ title = "Step 3: Pull from GitHub", fn = runDotSyncPull }},
-            {{ title = "Step 4: Apply to System (Repo -> System)", fn = runDotSyncApply }},
-            {{ title = "-", disabled = true }},
-            {{ title = "Open Dotfiles Repo", fn = function() hs.execute("open " .. repoPath) end }}
-        }})
-    end
-end
-"""
+end)
 
+dotChooser:choices({{
+    {{ text = "1. Stage Changes", subText = "System -> Repo", id = "stage" }},
+    {{ text = "2. Push to GitHub", subText = "Repo -> GitHub", id = "publish" }},
+    {{ text = "3. Pull from GitHub", subText = "GitHub -> Repo", id = "pull" }},
+    {{ text = "4. Apply to System", subText = "Repo -> System", id = "apply" }},
+    {{ text = "5. Full Sync", subText = "Automatically do all steps", id = "full" }}
+}})
+
+-- 2. THE MENU BAR ICON (Clickable list)
+if dotMenu then
+    dotMenu:setMenu({{
+        {{ title = "Shortcut: Cmd + Option + D", disabled = true }},
+        {{ title = "-", disabled = true }},
+        {{ title = "Stage Changes", fn = runDotSyncStage }},
+        {{ title = "Push to GitHub", fn = runDotSyncPublish }},
+        {{ title = "Pull from GitHub", fn = runDotSyncPull }},
+        {{ title = "Apply to System", fn = runDotSyncApply }},
+        {{ title = "-", disabled = true }},
+        {{ title = "Full Sync", fn = runDotSyncFull }},
+        {{ title = "Open Dotfiles Repo", fn = function() hs.execute("open " .. repoPath) end }}
+    }})
+end
+
+-- 3. THE KEYBOARD SHORTCUT
+hs.hotkey.bind({{"cmd", "alt"}}, "D", function()
+    dotChooser:show()
+end)
+
+-- 4. THE URL LISTENER
+hs.urlevent.bind("dotsync", function(eventName, params)
+    dotChooser:show()
+end)
+"""
     process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, text=True)
     process.communicate(lua_config)
-    
     print("\n✅ Hammerspoon configuration copied to clipboard!")
-    
-    hs_config_dir = Path.home() / ".hammerspoon"
-    hs_config_dir.mkdir(exist_ok=True)
-    init_lua = hs_config_dir / "init.lua"
-    if not init_lua.exists():
-        init_lua.touch()
-    subprocess.run(["open", str(init_lua)])
+    subprocess.run(["open", str(Path.home() / ".hammerspoon" / "init.lua")])
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else "sync"
