@@ -68,9 +68,6 @@ To verify the setup:
 git config user.name
 git config user.email
 ```
-
----
-
 ## Troubleshooting: Updating an Existing Repository
 
 If you already cloned a repository but it is trying to use your primary account, you need to update the remote URL and set your local config.
@@ -87,7 +84,155 @@ If you already cloned a repository but it is trying to use your primary account,
    git config user.email "tw@tw.com"
    ```
 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# ⚙️ Dotfiles Sync Engine
+
+A decentralized, copy-based automated sync tool for macOS configuration files.
+
+Instead of relying on messy symlinks, this tool uses a two-way sync engine based on file modification timestamps. It automatically stages, commits, pushes, and pulls your configuration files via Git. Background automation, menu bar controls, and silent desktop notifications are handled entirely by [Hammerspoon](https://www.hammerspoon.org/).
+
+## ✨ Features
+
+* **No Symlinks:** Files stay exactly where macOS expects them. The Git repo acts as a transport layer.
+* **Intelligent Two-Way Sync:** Automatically detects if a local file is newer than the repo, or if the repo is newer than the local file, and copies accordingly.
+* **Fully Automated:** Runs quietly in the background every 6 hours (configurable).
+* **Smart Notifications:** Only triggers a silent, auto-dismissing notification when a file is actually pushed or pulled.
+* **Dynamic Paths:** Handles user paths automatically across different Macs (e.g., `/Users/username/...`).
+
+---
+
+## 🛠️ Prerequisites
+
+* **macOS** (Tested on multiple Macs)
+* **Git** installed and authenticated with GitHub (SSH recommended)
+* **Homebrew** (The setup script uses Homebrew to automatically install Hammerspoon if you don't have it).
+
+---
+
+## 🚀 Setup: Mac 1 (The Source)
+
+Run these steps on the Mac that currently holds all your actual configuration files.
+
+1. **Create the repository:**
+```bash
+mkdir ~/my-dotfiles
+cd ~/my-dotfiles
+git init
+mkdir files
+
+```
+
+
+2. **Create the configuration files:**
+* Create `dotsync.py` and paste the sync script.
+* Make it executable: `chmod +x dotsync.py`
+* Create `manifest.json` and map the files you want to track (see Manifest section below).
+
+
+3. **Link to GitHub:**
+```bash
+git branch -M main
+git remote add origin git@github.com:YOUR_USERNAME/my-dotfiles.git
+
+```
+
+
+4. **Run the Initial Sync:**
+Because your system files are newer than the empty repository, running `sync` will copy your system configs into the repo and push them to GitHub.
+```bash
+python3 dotsync.py sync
+
+```
+
+
+5. **Install & Configure Hammerspoon:**
+```bash
+python3 dotsync.py setup
+
+```
+
+
+*This copies the Lua configuration to your clipboard and opens `init.lua`. Paste the contents, save, and click **Reload Config** in the Hammerspoon menu bar.*
+
+---
+
+## 💻 Setup: Mac 2+ (The Destinations)
+
+Run these steps on any new Mac you want to sync your settings to.
+
+1. **Clone the repository:**
+```bash
+git clone git@github.com:YOUR_USERNAME/my-dotfiles.git ~/my-dotfiles
+cd ~/my-dotfiles
+
+```
+
+
+2. **Run the Setup Command:**
+```bash
+chmod +x dotsync.py
+python3 dotsync.py setup
+
+```
+
+
+*This will automatically pull the files from the Git repo, back up any existing local configs, overwrite them with your tracked configs, and install Hammerspoon.*
+3. **Configure Hammerspoon:**
+Paste the configuration that was automatically copied to your clipboard into the opened `init.lua` file, save, and hit **Reload Config** in the menu bar.
+
+---
+
+## 📂 The `manifest.json` File
+
+This file tells the script which files to track and where they belong on the system.
+
+* **Key:** The relative path inside this Git repository (must start with `files/`).
+* **Value:** The absolute path on your Mac. You can safely use `~` or `$USER`; the script will expand them automatically based on the current machine.
+
+**Example:**
+
+```json
+{
+  "files/zshrc": "~/.zshrc",
+  "files/com.googlecode.iterm2.plist": "~/Library/Preferences/com.googlecode.iterm2.plist",
+  "files/nvim": "~/.config/nvim"
+}
+
+```
+
+---
+
+## ➕ How to Track a New File
+
+To start tracking a new configuration file across your Macs:
+
+1. Open `manifest.json` on any Mac and add the new key-value pair.
+2. Make a small change to that configuration file on your Mac (or just wait, if you've recently modified it).
+3. The background sync will notice the system file is newer than the repo (which doesn't have it yet), copy it into the `files/` directory, and push it to GitHub.
+4. Your other Macs will automatically pull it down on their next sync cycle!
+
+---
+
+## 🕹️ Hammerspoon Controls
+
+Once Hammerspoon is running, you can control the sync engine via:
+
+* **Menu Bar:** Click the ⚙️ icon to run a manual sync or open the repository folder.
+* **Global Hotkey:** Press `Option + Cmd + S` from anywhere to trigger an immediate sync.
+
+### Testing vs. Production Mode
+
+By default, the script generates the Hammerspoon config in **Testing Mode**, running every 1 minute.
+
+To switch to **Production Mode** (runs every 6 hours):
+
+1. Open your Hammerspoon config (`~/.hammerspoon/init.lua`).
+2. Change `local testingMode = true` to `local testingMode = false`.
+3. Save the file and select **Reload Config** from the Hammerspoon menu bar.
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 To see the cron jobs for the current user: `crontab -l`
 To edit the cron jobs for the current user: `crontab -e`
