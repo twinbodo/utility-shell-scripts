@@ -91,7 +91,7 @@ local repoPath = "{REPO_DIR}"
 local syncScript = repoPath .. "/dotsync.py"
 
 -- CONFIGURATION
-local testingMode = true -- Set to false to run every 6 hours instead of every minute
+local testingMode = false -- Set to false to run every 6 hours instead of every minute
 
 local dotMenu = hs.menubar.new()
 dotMenu:setTitle("⚙️")
