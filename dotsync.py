@@ -87,6 +87,7 @@ def setup_hammerspoon():
         lua_repo_path = f'"{REPO_DIR}"'
 
     lua_config = f"""
+require("bluetooth")
 local repoPath = {lua_repo_path}
 local syncScript = repoPath .. "/dotsync.py"
 

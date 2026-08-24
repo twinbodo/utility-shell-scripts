@@ -1,4 +1,5 @@
 {
   "files/com.googlecode.iterm2.plist": "~/Library/Preferences/com.googlecode.iterm2.plist",
-  "files/vscode.keybindings.json": "~/Library/Application Support/Code/User/keybindings.json"
+  "files/vscode.keybindings.json": "~/Library/Application Support/Code/User/keybindings.json",
+  "files/hammerspoon.bluetooth.lua": "~/.hammerspoon/bluetooth.lua"
 }
