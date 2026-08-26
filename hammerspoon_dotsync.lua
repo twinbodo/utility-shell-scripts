@@ -1,3 +1,6 @@
+require("bluetooth")
+require("cursor")
+
 local repoPath = os.getenv("HOME") .. "/work/utility-shell-scripts"
 local syncScript = repoPath .. "/dotsync.py"
 
