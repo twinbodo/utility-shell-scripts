@@ -11,7 +11,13 @@ local function checkCursorWrap()
     -- Get position using the new API
     local pos = hs.mouse.absolutePosition()
     local screen = hs.mouse.getCurrentScreen()
+    
+    -- SAFETY CHECK: Stop if macOS temporarily loses the screen 
+    if not screen then return end
+    
     local nextScreen = screen:next()
+    -- SAFETY CHECK: Stop if the next screen is unavailable
+    if not nextScreen then return end
     
     -- Get the physical boundaries of the current and next screen
     local f = screen:fullFrame()
@@ -31,7 +37,6 @@ local function checkCursorWrap()
 
     -- 1. Hit LEFT edge -> Teleport to RIGHT edge of next screen
     if pos.x <= f.x + threshold then
-        -- Set position using the new API
         hs.mouse.absolutePosition({x = nf.x + nf.w - offset, y = mappedY})
         
     -- 2. Hit RIGHT edge -> Teleport to LEFT edge of next screen
