@@ -1,6 +1,18 @@
 require("bluetooth")
 require("cursor")
 
+-- Switch Monitor to USB-C (Standard DDC code is 27)
+hs.hotkey.bind({{"cmd", "shift"}}, "1", function()
+    hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 27")
+    hs.alert.show("Switched to USB-C")
+end)
+
+-- Switch Monitor to HDMI (Standard DDC code is 17)
+hs.hotkey.bind({{"cmd", "shift"}}, "2", function()
+    hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 17")
+    hs.alert.show("Switched to HDMI")
+end)
+
 local repoPath = os.getenv("HOME") .. "/work/utility-shell-scripts"
 local syncScript = repoPath .. "/dotsync.py"
 
