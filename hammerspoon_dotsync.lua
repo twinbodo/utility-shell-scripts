@@ -1,15 +1,67 @@
 require("bluetooth")
 require("cursor")
 
+local log = hs.logger.new('DotSync', 'debug')
+
+-- ==========================================
+-- 0. DDC TOOL SETUP (Auto-detect & Install)
+-- ==========================================
+local function setupDDCTool()
+    local arch = hs.execute("uname -m"):gsub("%s+", "")
+    local isAppleSilicon = (arch == "arm64")
+    
+    local brewPath = isAppleSilicon and "/opt/homebrew/bin/brew" or "/usr/local/bin/brew"
+    local ddcPath = isAppleSilicon and "/opt/homebrew/bin/m1ddc" or "/usr/local/bin/ddcctl"
+    local toolName = isAppleSilicon and "m1ddc" or "ddcctl"
+
+    -- Function to check if file exists
+    local function fileExists(path)
+        local f = io.open(path, "r")
+        if f then io.close(f) return true else return false end
+    end
+
+    if not fileExists(ddcPath) then
+        log.w(toolName .. " not found at " .. ddcPath .. ". Attempting to install...")
+        hs.notify.new({ title = "Installing Display Tool", informativeText = "Installing " .. toolName .. " via Homebrew in the background..." }):send()
+        
+        -- Run brew install in the background to avoid freezing Hammerspoon
+        hs.task.new(brewPath, function(exitCode, stdOut, stdErr)
+            if exitCode == 0 then
+                hs.notify.new({ title = "Install Complete", informativeText = toolName .. " installed successfully!" }):send()
+                log.i(toolName .. " installed successfully.")
+            else
+                hs.notify.new({ title = "Install Failed", informativeText = "Failed to install " .. toolName .. ". Please install manually." }):send()
+                log.e("Failed to install " .. toolName .. ": " .. (stdErr or stdOut))
+            end
+        end, {"install", toolName}):start()
+    end
+
+    return isAppleSilicon, ddcPath
+end
+
+local isAppleSilicon, ddcToolPath = setupDDCTool()
+
+-- ==========================================
+-- MONITOR SWITCHING BINDS
+-- ==========================================
+
 -- Switch Monitor to USB-C (Standard DDC code is 27)
-hs.hotkey.bind({{"cmd", "shift"}}, "1", function()
-    hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 27")
+hs.hotkey.bind({"cmd", "shift"}, "1", function()
+    if isAppleSilicon then
+        hs.execute(ddcToolPath .. " display 1 set input 27")
+    else
+        hs.execute(ddcToolPath .. " -d 1 -i 27")
+    end
     hs.alert.show("Switched to USB-C")
 end)
 
 -- Switch Monitor to HDMI (Standard DDC code is 17)
-hs.hotkey.bind({{"cmd", "shift"}}, "2", function()
-    hs.execute("/opt/homebrew/bin/m1ddc display 1 set input 17")
+hs.hotkey.bind({"cmd", "shift"}, "2", function()
+    if isAppleSilicon then
+        hs.execute(ddcToolPath .. " display 1 set input 17")
+    else
+        hs.execute(ddcToolPath .. " -d 1 -i 17")
+    end
     hs.alert.show("Switched to HDMI")
 end)
 
