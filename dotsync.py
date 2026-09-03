@@ -122,6 +122,53 @@ def sync(mode="sync"):
         return True, "\n".join(synced_items)
     return True, "NO_CHANGES"
 
+def install_hammerspoon():
+    """Checks if Hammerspoon is installed, and installs it if missing."""
+    app_path = Path("/Applications/Hammerspoon.app")
+    if app_path.exists():
+        logger.info("Hammerspoon is already installed at /Applications/Hammerspoon.app")
+        return True
+
+    logger.info("Hammerspoon is not installed. Initiating installation...")
+    
+    # 1. Try installing via Homebrew first
+    if shutil.which("brew"):
+        logger.info("Homebrew detected. Installing via Homebrew...")
+        result = subprocess.run(["brew", "install", "--cask", "hammerspoon"], capture_output=True, text=True)
+        if result.returncode == 0:
+            logger.info("✅ Hammerspoon successfully installed via Homebrew.")
+            return True
+        else:
+            logger.warning("Homebrew installation failed. Falling back to direct download...")
+    
+    # 2. Fallback to direct download using curl and unzip
+    logger.info("Downloading the latest Hammerspoon release from GitHub...")
+    zip_path = Path("/tmp/Hammerspoon.zip")
+    
+    curl_result = subprocess.run([
+        "curl", "-L", "https://github.com/Hammerspoon/hammerspoon/releases/latest/download/Hammerspoon.zip", "-o", str(zip_path)
+    ], capture_output=True)
+    
+    if curl_result.returncode != 0:
+        logger.error("Failed to download Hammerspoon.")
+        return False
+        
+    logger.info("Extracting to /Applications...")
+    unzip_result = subprocess.run(["unzip", "-qo", str(zip_path), "-d", "/Applications"], capture_output=True)
+    
+    # Clean up the downloaded zip file
+    if zip_path.exists():
+        zip_path.unlink()
+        
+    if unzip_result.returncode == 0 and app_path.exists():
+        logger.info("Removing Apple quarantine attribute so the app can run...")
+        subprocess.run(["xattr", "-cr", str(app_path)])
+        logger.info("✅ Hammerspoon successfully installed via direct download.")
+        return True
+    
+    logger.error("Installation failed. Please install Hammerspoon manually from https://hammerspoon.org/")
+    return False
+
 def get_lua_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     lua_file_path = os.path.join(script_dir, "hammerspoon_dotsync.lua")
@@ -171,18 +218,27 @@ def update_lua():
 def setup_hammerspoon():
     logger.info("Setting up Hammerspoon...")
     
-    # Run the automated Lua update which creates dotsync.lua and edits init.lua
+    # 1. Install Hammerspoon if missing
+    if not install_hammerspoon():
+        logger.error("Aborting configuration due to installation failure.")
+        return
+    
+    # 2. Run the automated Lua update which creates dotsync.lua and edits init.lua
     success, message = update_lua()
     
     if success:
         logger.info("✅ Hammerspoon configuration successfully automated!")
     else:
-        logger.error(f"Failed to setup Hammerspoon: {message}")
+        logger.error(f"Failed to setup Hammerspoon config: {message}")
         
-    # Open init.lua in default editor just for visual confirmation
+    # 3. Launch Hammerspoon
+    logger.info("Launching Hammerspoon application...")
+    subprocess.run(["open", "-a", "Hammerspoon"])
+    
+    # 4. Open init.lua in default editor just for visual confirmation
     init_lua = Path.home() / ".hammerspoon" / "init.lua"
     if init_lua.exists():
-        logger.info("Opening init.lua in default editor for confirmation...")
+        logger.info("Opening init.lua in default editor for your review...")
         subprocess.run(["open", str(init_lua)])
 
 if __name__ == "__main__":
