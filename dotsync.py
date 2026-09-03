@@ -147,12 +147,14 @@ def update_lua():
     hs_dir.mkdir(parents=True, exist_ok=True)
     changed = False
 
+    # 1. Ensure dotsync.lua exists and is up to date
     current_dotsync = dotsync_lua.read_text().strip() if dotsync_lua.exists() else ""
     if current_dotsync != lua_code:
         dotsync_lua.write_text(lua_code + "\n")
         logger.info("Wrote new configuration to dotsync.lua")
         changed = True
         
+    # 2. Check if init.lua has the require reference, if not append it safely
     import_stmt = 'require("dotsync")'
     current_init = init_lua.read_text() if init_lua.exists() else ""
     
@@ -169,23 +171,19 @@ def update_lua():
 def setup_hammerspoon():
     logger.info("Setting up Hammerspoon...")
     
-    # FIX: Ensure directory and init.lua exist before attempting to open them
-    hs_dir = Path.home() / ".hammerspoon"
-    init_lua = hs_dir / "init.lua"
-    hs_dir.mkdir(parents=True, exist_ok=True)
+    # Run the automated Lua update which creates dotsync.lua and edits init.lua
+    success, message = update_lua()
     
-    if not init_lua.exists():
-        init_lua.touch()
-        logger.info(f"Created missing file: {init_lua}")
-
-    lua_config = get_lua_config()
-    if not lua_config.startswith("Error:"):
-        process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, text=True)
-        process.communicate(lua_config)
-        logger.info("✅ Hammerspoon configuration copied to clipboard!")
+    if success:
+        logger.info("✅ Hammerspoon configuration successfully automated!")
+    else:
+        logger.error(f"Failed to setup Hammerspoon: {message}")
         
-    logger.info("Opening init.lua in default editor...")
-    subprocess.run(["open", str(init_lua)])
+    # Open init.lua in default editor just for visual confirmation
+    init_lua = Path.home() / ".hammerspoon" / "init.lua"
+    if init_lua.exists():
+        logger.info("Opening init.lua in default editor for confirmation...")
+        subprocess.run(["open", str(init_lua)])
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else "sync"
